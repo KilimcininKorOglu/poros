@@ -5,11 +5,12 @@ prd.md
 data/
 *.mmdb
 
+# Build output
+bin/
+
 # Go binaries (root level only)
 /poros
 /poros.exe
-*.exe
-*.exe~
 *.dll
 *.so
 *.dylib
