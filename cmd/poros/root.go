@@ -8,6 +8,7 @@ import (
 
 	"github.com/KilimcininKorOglu/poros/internal/output"
 	"github.com/KilimcininKorOglu/poros/internal/trace"
+	"github.com/KilimcininKorOglu/poros/internal/tui"
 	"github.com/spf13/cobra"
 )
 
@@ -145,6 +146,11 @@ func runTrace(cmd *cobra.Command, args []string) error {
 		config.ProbeMethod = trace.ProbeTCP
 	} else {
 		config.ProbeMethod = trace.ProbeICMP
+	}
+
+	// If TUI mode requested, run TUI
+	if tuiMode {
+		return tui.Run(target, config)
 	}
 
 	// Create tracer
