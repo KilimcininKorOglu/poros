@@ -199,7 +199,20 @@ func runTrace(cmd *cobra.Command, args []string) error {
 
 	// Create writer and output results
 	writer := output.NewWriter(format, outputConfig)
-	return writer.Write(result)
+	if err := writer.Write(result); err != nil {
+		return err
+	}
+
+	// Generate HTML report if requested
+	if htmlOutput != "" {
+		htmlFormatter := output.NewHTMLFormatter(outputConfig)
+		if err := output.WriteToFile(result, htmlOutput, htmlFormatter); err != nil {
+			return fmt.Errorf("failed to write HTML report: %w", err)
+		}
+		fmt.Fprintf(os.Stderr, "\nHTML report saved to: %s\n", htmlOutput)
+	}
+
+	return nil
 }
 
 // Execute runs the root command.

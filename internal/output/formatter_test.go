@@ -253,6 +253,7 @@ func TestNewFormatter(t *testing.T) {
 		{FormatVerbose, "text/plain"},
 		{FormatJSON, "application/json"},
 		{FormatCSV, "text/csv"},
+		{FormatHTML, "text/html"},
 	}
 
 	for _, tt := range tests {
@@ -262,6 +263,64 @@ func TestNewFormatter(t *testing.T) {
 				t.Errorf("ContentType() = %q, want %q", formatter.ContentType(), tt.expected)
 			}
 		})
+	}
+}
+
+func TestHTMLFormatter(t *testing.T) {
+	config := Config{Colors: false}
+	formatter := NewHTMLFormatter(config)
+
+	result := sampleTraceResult()
+	data, err := formatter.Format(result)
+	if err != nil {
+		t.Fatalf("Format() error = %v", err)
+	}
+
+	output := string(data)
+
+	// Check DOCTYPE
+	if !strings.Contains(output, "<!DOCTYPE html>") {
+		t.Error("Output should contain DOCTYPE")
+	}
+
+	// Check title
+	if !strings.Contains(output, "google.com") {
+		t.Error("Output should contain target")
+	}
+
+	// Check hop data
+	if !strings.Contains(output, "192.168.1.1") {
+		t.Error("Output should contain hop IP")
+	}
+
+	// Check CSS
+	if !strings.Contains(output, "<style>") {
+		t.Error("Output should contain embedded CSS")
+	}
+
+	// Check summary
+	if !strings.Contains(output, "Total Hops") {
+		t.Error("Output should contain summary")
+	}
+}
+
+func TestHTMLFormatter_RTTClass(t *testing.T) {
+	tests := []struct {
+		rtt      float64
+		expected string
+	}{
+		{0, "neutral"},
+		{-1, "neutral"},
+		{25, "good"},
+		{75, "medium"},
+		{200, "bad"},
+	}
+
+	for _, tt := range tests {
+		result := rttClass(tt.rtt)
+		if result != tt.expected {
+			t.Errorf("rttClass(%v) = %q, want %q", tt.rtt, result, tt.expected)
+		}
 	}
 }
 

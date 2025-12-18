@@ -88,6 +88,8 @@ func NewFormatter(format Format, config Config) Formatter {
 		return NewJSONFormatter(config)
 	case FormatCSV:
 		return NewCSVFormatter(config)
+	case FormatHTML:
+		return NewHTMLFormatter(config)
 	default:
 		return NewTextFormatter(config)
 	}
