@@ -65,18 +65,18 @@ exit /b 1
 :build
 echo %GREEN%Building %BINARY_NAME% for Windows...%NC%
 if not exist "%BINARY_DIR%" mkdir "%BINARY_DIR%"
-go build %LDFLAGS% -o "%BINARY_DIR%\%BINARY_NAME%.exe" .\cmd\poros
+go build %LDFLAGS% -o "%BINARY_DIR%\%BINARY_NAME%-windows-amd64.exe" .\cmd\poros
 if errorlevel 1 (
     echo %RED%Build failed%NC%
     exit /b 1
 )
-echo %GREEN%Built: %BINARY_DIR%\%BINARY_NAME%.exe%NC%
+echo %GREEN%Built: %BINARY_DIR%\%BINARY_NAME%-windows-amd64.exe%NC%
 goto :eof
 
 :dev
 echo %CYAN%Building development version (no optimizations)...%NC%
 if not exist "%BINARY_DIR%" mkdir "%BINARY_DIR%"
-go build -o "%BINARY_DIR%\%BINARY_NAME%.exe" .\cmd\poros
+go build -o "%BINARY_DIR%\%BINARY_NAME%-windows-amd64.exe" .\cmd\poros
 if errorlevel 1 (
     echo %RED%Build failed%NC%
     exit /b 1
@@ -287,7 +287,6 @@ echo %CYAN%Cleaning build artifacts...%NC%
 if exist "%BINARY_DIR%" rmdir /s /q "%BINARY_DIR%"
 if exist "coverage.out" del "coverage.out"
 if exist "coverage.html" del "coverage.html"
-if exist "%BINARY_NAME%.exe" del "%BINARY_NAME%.exe"
 echo %GREEN%Cleaned%NC%
 goto :eof
 
@@ -296,7 +295,7 @@ call :build
 if errorlevel 1 exit /b 1
 echo %GREEN%Running %BINARY_NAME%...%NC%
 echo.
-"%BINARY_DIR%\%BINARY_NAME%.exe" %2 %3 %4 %5 %6 %7 %8 %9
+"%BINARY_DIR%\%BINARY_NAME%-windows-amd64.exe" %2 %3 %4 %5 %6 %7 %8 %9
 goto :eof
 
 :version
@@ -354,8 +353,10 @@ echo   build.bat test                 Run all tests
 echo   build.bat check                Run all quality checks
 echo.
 echo %CYAN%Output:%NC%
-echo   bin\poros.exe                  Windows binary
+echo   bin\poros-windows-amd64.exe    Windows binary
 echo   bin\poros-linux-amd64          Linux binary
+echo   bin\poros-linux-arm64          Linux ARM64 binary
+echo   bin\poros-darwin-amd64         macOS Intel binary
 echo   bin\poros-darwin-arm64         macOS Apple Silicon binary
 echo.
 goto :eof
