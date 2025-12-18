@@ -187,26 +187,37 @@ func (m Model) renderHops() string {
 		return m.styles.Subtle.Render("Waiting for responses...")
 	}
 
+	// Calculate hostname column width based on terminal width
+	// Fixed columns: Hop(4) + IP(16) + Avg(9) + Min(8) + Max(8) + spaces(12) = 57
+	hostnameWidth := m.width - 57
+	if hostnameWidth < 20 {
+		hostnameWidth = 20
+	}
+	if hostnameWidth > 60 {
+		hostnameWidth = 60
+	}
+
 	var rows []string
 
 	// Header row - use fixed width columns
-	header := fmt.Sprintf("%-4s  %-16s  %-22s  %9s  %8s  %8s",
-		"Hop", "IP", "Hostname", "Avg", "Min", "Max")
+	header := fmt.Sprintf("%-4s  %-16s  %-*s  %9s  %8s  %8s",
+		"Hop", "IP", hostnameWidth, "Hostname", "Avg", "Min", "Max")
 	rows = append(rows, m.styles.Header.Render(header))
 
-	// Separator
-	rows = append(rows, m.styles.Subtle.Render(strings.Repeat("─", 76)))
+	// Separator - match total width
+	totalWidth := 4 + 2 + 16 + 2 + hostnameWidth + 2 + 9 + 2 + 8 + 2 + 8
+	rows = append(rows, m.styles.Subtle.Render(strings.Repeat("─", totalWidth)))
 
 	// Hop rows
 	for _, hop := range m.hops {
-		rows = append(rows, m.renderHopRow(hop))
+		rows = append(rows, m.renderHopRow(hop, hostnameWidth))
 	}
 
 	return strings.Join(rows, "\n")
 }
 
 // renderHopRow renders a single hop row.
-func (m Model) renderHopRow(hop trace.Hop) string {
+func (m Model) renderHopRow(hop trace.Hop, hostnameWidth int) string {
 	// Format values with fixed widths FIRST, then apply colors
 	hopNum := fmt.Sprintf("%-4d", hop.Number)
 	
@@ -215,7 +226,7 @@ func (m Model) renderHopRow(hop trace.Hop) string {
 
 	if !hop.Responded {
 		ip = fmt.Sprintf("%-16s", "*")
-		hostname = fmt.Sprintf("%-22s", "*")
+		hostname = fmt.Sprintf("%-*s", hostnameWidth, "*")
 		avg = fmt.Sprintf("%9s", "*")
 		min = fmt.Sprintf("%8s", "*")
 		max = fmt.Sprintf("%8s", "*")
@@ -225,7 +236,8 @@ func (m Model) renderHopRow(hop trace.Hop) string {
 		} else {
 			ip = fmt.Sprintf("%-16s", "*")
 		}
-		hostname = fmt.Sprintf("%-22s", truncate(hop.Hostname, 22))
+		// Show full hostname up to hostnameWidth
+		hostname = fmt.Sprintf("%-*s", hostnameWidth, truncate(hop.Hostname, hostnameWidth))
 
 		if hop.AvgRTT > 0 {
 			avgRTT = hop.AvgRTT
