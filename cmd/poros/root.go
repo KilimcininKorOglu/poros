@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
+	"github.com/KilimcininKorOglu/poros/internal/output"
 	"github.com/KilimcininKorOglu/poros/internal/trace"
 	"github.com/spf13/cobra"
 )
@@ -148,55 +150,40 @@ func runTrace(cmd *cobra.Command, args []string) error {
 		ctx = context.Background()
 	}
 
-	fmt.Printf("Tracing route to %s, %d hops max, %d byte packets\n\n", target, maxHops, 64)
+	// Only show header for text output
+	if !jsonOutput && !csvOutput {
+		fmt.Fprintf(os.Stderr, "Tracing route to %s, %d hops max\n\n", target, maxHops)
+	}
 
 	result, err := tracer.Trace(ctx, target)
 	if err != nil {
 		return fmt.Errorf("trace failed: %w", err)
 	}
 
-	// Print results
-	printTraceResult(result)
-
-	return nil
-}
-
-func printTraceResult(result *trace.TraceResult) {
-	for _, hop := range result.Hops {
-		fmt.Printf("%3d  ", hop.Number)
-
-		if !hop.Responded {
-			fmt.Println("* * *")
-			continue
-		}
-
-		// Print IP (and hostname if available)
-		if hop.Hostname != "" {
-			fmt.Printf("%s (%s)  ", hop.Hostname, hop.IP)
-		} else {
-			fmt.Printf("%s  ", hop.IP)
-		}
-
-		// Print RTTs
-		for _, rtt := range hop.RTTs {
-			if rtt < 0 {
-				fmt.Print("*  ")
-			} else {
-				fmt.Printf("%.3f ms  ", rtt)
-			}
-		}
-
-		fmt.Println()
+	// Configure output
+	outputConfig := output.Config{
+		Colors:     !noColor,
+		NoHostname: false,
+		NoASN:      noASN,
+		NoGeoIP:    noGeoIP,
 	}
 
-	// Print summary
-	fmt.Println()
-	if result.Completed {
-		fmt.Printf("Trace complete. %d hops, %.2f ms total\n", 
-			result.Summary.TotalHops, result.Summary.TotalTimeMs)
-	} else {
-		fmt.Printf("Trace incomplete after %d hops\n", result.Summary.TotalHops)
+	// Determine output format
+	var format output.Format
+	switch {
+	case jsonOutput:
+		format = output.FormatJSON
+	case csvOutput:
+		format = output.FormatCSV
+	case verbose:
+		format = output.FormatVerbose
+	default:
+		format = output.FormatText
 	}
+
+	// Create writer and output results
+	writer := output.NewWriter(format, outputConfig)
+	return writer.Write(result)
 }
 
 // Execute runs the root command.
