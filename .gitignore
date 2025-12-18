@@ -5,9 +5,9 @@ prd.md
 data/
 *.mmdb
 
-# Go binaries
-poros
-poros.exe
+# Go binaries (root level only)
+/poros
+/poros.exe
 *.exe
 *.exe~
 *.dll
