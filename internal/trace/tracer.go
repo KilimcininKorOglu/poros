@@ -37,8 +37,11 @@ func New(config *Config) (*Tracer, error) {
 			IPv6:    config.IPv6,
 		})
 	case ProbeUDP:
-		// TODO: Implement UDP prober
-		return nil, fmt.Errorf("UDP probe not yet implemented")
+		prober, err = probe.NewUDPProber(probe.UDPProberConfig{
+			Timeout:  config.Timeout,
+			BasePort: config.DestPort,
+			IPv6:     config.IPv6,
+		})
 	case ProbeTCP:
 		// TODO: Implement TCP prober
 		return nil, fmt.Errorf("TCP probe not yet implemented")

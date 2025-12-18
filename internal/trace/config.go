@@ -76,6 +76,7 @@ func DefaultConfig() *Config {
 		MaxHops:          30,
 		FirstHop:         1,
 		Timeout:          3 * time.Second,
+		DestPort:         33434, // Standard traceroute UDP port
 		MaxConcurrency:   30,
 		EnableEnrichment: true,
 		EnableRDNS:       true,

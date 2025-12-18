@@ -127,6 +127,7 @@ func runTrace(cmd *cobra.Command, args []string) error {
 	config.Sequential = sequential
 	config.IPv4 = forceIPv4
 	config.IPv6 = forceIPv6
+	config.DestPort = destPort
 
 	// Set probe method
 	if useUDP {
