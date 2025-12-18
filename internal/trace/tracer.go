@@ -72,9 +72,7 @@ func (t *Tracer) Trace(ctx context.Context, target string) (*TraceResult, error)
 	if t.config.Sequential {
 		hops, err = t.traceSequential(ctx, dest)
 	} else {
-		// For now, use sequential mode
-		// TODO: Implement concurrent mode
-		hops, err = t.traceSequential(ctx, dest)
+		hops, err = t.traceConcurrent(ctx, dest)
 	}
 
 	if err != nil {
