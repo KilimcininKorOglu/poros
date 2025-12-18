@@ -63,7 +63,7 @@ func (f *TextFormatter) FormatHop(hop *trace.Hop) string {
 
 // formatHop formats a single hop line.
 func (f *TextFormatter) formatHop(buf *bytes.Buffer, hop *trace.Hop) {
-	// Hop number
+	// Hop number - fixed width
 	hopNum := fmt.Sprintf("%3d  ", hop.Number)
 	if f.colors != nil {
 		hopNum = f.colors.Hop.Sprint(hopNum)
@@ -81,43 +81,47 @@ func (f *TextFormatter) formatHop(buf *bytes.Buffer, hop *trace.Hop) {
 		return
 	}
 
-	// IP address
+	// IP address - fixed width 16 chars
 	ipStr := hop.IP.String()
+	ipFormatted := fmt.Sprintf("%-16s", ipStr)
 	if f.colors != nil {
-		ipStr = f.colors.IP.Sprint(ipStr)
+		ipFormatted = f.colors.IP.Sprint(ipFormatted)
 	}
+	buf.WriteString(ipFormatted)
 
-	// Hostname (if available and not disabled)
-	if hop.Hostname != "" && !f.config.NoHostname {
-		hostname := hop.Hostname
-		if f.colors != nil {
-			hostname = f.colors.Hostname.Sprint(hostname)
+	// Hostname (if available and not disabled) - fixed width 30 chars
+	if !f.config.NoHostname {
+		hostname := ""
+		if hop.Hostname != "" {
+			hostname = truncateString(hop.Hostname, 28)
 		}
-		fmt.Fprintf(buf, "%s (%s)  ", hostname, ipStr)
-	} else {
-		fmt.Fprintf(buf, "%s  ", ipStr)
+		hostnameFormatted := fmt.Sprintf("%-30s", hostname)
+		if f.colors != nil && hostname != "" {
+			hostnameFormatted = f.colors.Hostname.Sprint(fmt.Sprintf("%-30s", hostname))
+		}
+		buf.WriteString(hostnameFormatted)
 	}
 
-	// RTT values
+	// RTT values - fixed width 10 chars each
 	for _, rtt := range hop.RTTs {
 		if rtt < 0 {
-			timeout := "*"
+			timeout := fmt.Sprintf("%10s", "*")
 			if f.colors != nil {
 				timeout = f.colors.Timeout.Sprint(timeout)
 			}
-			fmt.Fprintf(buf, "%s  ", timeout)
+			buf.WriteString(timeout)
 		} else {
-			rttStr := fmt.Sprintf("%.3f ms", rtt)
+			rttStr := fmt.Sprintf("%7.2f ms", rtt)
 			if f.colors != nil {
 				rttStr = f.colorizeRTT(rtt)
 			}
-			fmt.Fprintf(buf, "%s  ", rttStr)
+			buf.WriteString(rttStr)
 		}
 	}
 
 	// ASN info (if available and not disabled)
 	if hop.ASN != nil && !f.config.NoASN {
-		asnStr := fmt.Sprintf("[AS%d %s]", hop.ASN.Number, truncateString(hop.ASN.Org, 20))
+		asnStr := fmt.Sprintf("  [AS%d %s]", hop.ASN.Number, truncateString(hop.ASN.Org, 15))
 		if f.colors != nil {
 			asnStr = f.colors.ASN.Sprint(asnStr)
 		}
@@ -129,7 +133,7 @@ func (f *TextFormatter) formatHop(buf *bytes.Buffer, hop *trace.Hop) {
 
 // colorizeRTT returns a colored RTT string based on latency thresholds.
 func (f *TextFormatter) colorizeRTT(rtt float64) string {
-	str := fmt.Sprintf("%.3f ms", rtt)
+	str := fmt.Sprintf("%7.2f ms", rtt)
 	if f.colors == nil {
 		return str
 	}
