@@ -239,6 +239,36 @@ func (t *Tracer) traceSequential(ctx context.Context, dest net.IP) ([]Hop, error
 		}
 
 		hop := t.probeHop(ctx, dest, ttl)
+		
+		// Enrich this hop immediately if enricher is available
+		if t.enricher != nil && hop.IP != nil {
+			enrichResults := t.enricher.EnrichIPs(ctx, []net.IP{hop.IP})
+			if result := enrichResults[hop.IP.String()]; result != nil {
+				hop.Hostname = result.Hostname
+				if result.ASN != nil {
+					hop.ASN = &ASNInfo{
+						Number:  result.ASN.Number,
+						Org:     result.ASN.Org,
+						Country: result.ASN.Country,
+					}
+				}
+				if result.Geo != nil {
+					hop.Geo = &GeoInfo{
+						Country:     result.Geo.Country,
+						CountryCode: result.Geo.CountryCode,
+						City:        result.Geo.City,
+						Latitude:    result.Geo.Latitude,
+						Longitude:   result.Geo.Longitude,
+					}
+				}
+			}
+		}
+		
+		// Call OnHop callback for real-time output
+		if t.config.OnHop != nil {
+			t.config.OnHop(&hop)
+		}
+		
 		hops = append(hops, hop)
 
 		// Check if we've reached the destination

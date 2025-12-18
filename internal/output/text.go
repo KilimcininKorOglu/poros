@@ -53,6 +53,14 @@ func (f *TextFormatter) Format(result *trace.TraceResult) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
+// FormatHop formats a single hop and returns it as a string.
+// This can be used for streaming output.
+func (f *TextFormatter) FormatHop(hop *trace.Hop) string {
+	var buf bytes.Buffer
+	f.formatHop(&buf, hop)
+	return buf.String()
+}
+
 // formatHop formats a single hop line.
 func (f *TextFormatter) formatHop(buf *bytes.Buffer, hop *trace.Hop) {
 	// Hop number

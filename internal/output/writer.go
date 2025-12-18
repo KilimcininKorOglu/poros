@@ -52,7 +52,16 @@ func (w *Writer) Write(result *trace.TraceResult) error {
 	}
 
 	_, err = w.output.Write(data)
-	return err
+	if err != nil {
+		return err
+	}
+
+	// Flush output if it's a file (ensures output is visible immediately)
+	if f, ok := w.output.(*os.File); ok {
+		f.Sync()
+	}
+
+	return nil
 }
 
 // SetOutput changes the output destination.

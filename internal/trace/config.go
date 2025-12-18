@@ -66,6 +66,9 @@ type Config struct {
 	EnableGeoIP      bool   // Enable GeoIP lookup
 	ASNDBPath        string // Path to MaxMind ASN database
 	GeoDBPath        string // Path to MaxMind GeoIP database
+
+	// Callback for real-time hop updates (streaming output)
+	OnHop func(hop *Hop) // Called after each hop is probed
 }
 
 // DefaultConfig returns a Config with sensible defaults.

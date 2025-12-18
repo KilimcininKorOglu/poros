@@ -375,9 +375,27 @@ func runTrace(cmd *cobra.Command, args []string) error {
 		traceConfig.ProbeMethod = trace.ProbeICMP
 	}
 
+	// Configure output
+	outputConfig := output.Config{
+		Colors:     !noColor,
+		NoHostname: false,
+		NoASN:      noASN,
+		NoGeoIP:    noGeoIP,
+	}
+
 	// If TUI mode requested, run TUI
 	if tuiMode {
 		return tui.Run(target, traceConfig)
+	}
+
+	// For streaming text output, set up OnHop callback
+	var textFormatter *output.TextFormatter
+	if !jsonOutput && !csvOutput {
+		textFormatter = output.NewTextFormatter(outputConfig)
+		traceConfig.OnHop = func(hop *trace.Hop) {
+			fmt.Print(textFormatter.FormatHop(hop))
+			os.Stdout.Sync() // Flush immediately
+		}
 	}
 
 	// Create tracer
@@ -393,9 +411,9 @@ func runTrace(cmd *cobra.Command, args []string) error {
 		ctx = context.Background()
 	}
 
-	// Only show header for text output
+	// Show header for text output
 	if !jsonOutput && !csvOutput {
-		fmt.Fprintf(os.Stderr, "Tracing route to %s, %d hops max\n\n", target, maxHops)
+		fmt.Printf("traceroute to %s, %d hops max\n\n", target, maxHops)
 	}
 
 	result, err := tracer.Trace(ctx, target)
@@ -403,31 +421,33 @@ func runTrace(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("trace failed: %w", err)
 	}
 
-	// Configure output
-	outputConfig := output.Config{
-		Colors:     !noColor,
-		NoHostname: false,
-		NoASN:      noASN,
-		NoGeoIP:    noGeoIP,
-	}
-
-	// Determine output format
-	var format output.Format
-	switch {
-	case jsonOutput:
-		format = output.FormatJSON
-	case csvOutput:
-		format = output.FormatCSV
-	case verbose:
-		format = output.FormatVerbose
-	default:
-		format = output.FormatText
-	}
-
-	// Create writer and output results
-	writer := output.NewWriter(format, outputConfig)
-	if err := writer.Write(result); err != nil {
-		return err
+	// For JSON/CSV, output the full result at once
+	if jsonOutput || csvOutput {
+		var format output.Format
+		if jsonOutput {
+			format = output.FormatJSON
+		} else {
+			format = output.FormatCSV
+		}
+		writer := output.NewWriter(format, outputConfig)
+		if err := writer.Write(result); err != nil {
+			return err
+		}
+	} else if verbose {
+		// Verbose table output (not streaming)
+		writer := output.NewWriter(output.FormatVerbose, outputConfig)
+		if err := writer.Write(result); err != nil {
+			return err
+		}
+	} else {
+		// Text output - summary only (hops already printed via OnHop)
+		fmt.Println()
+		if result.Completed {
+			fmt.Printf("Trace complete. %d hops, %.2f ms total\n",
+				result.Summary.TotalHops, result.Summary.TotalTimeMs)
+		} else {
+			fmt.Printf("Trace incomplete after %d hops\n", result.Summary.TotalHops)
+		}
 	}
 
 	// Generate HTML report if requested
@@ -476,9 +496,14 @@ func promptForTarget() (string, error) {
 
 	for {
 		green.Print("  Enter target (IP or hostname): ")
+		os.Stdout.Sync() // Flush stdout
 
 		input, err := reader.ReadString('\n')
 		if err != nil {
+			// Check for EOF (Ctrl+D or piped input ended)
+			if err.Error() == "EOF" {
+				return "", fmt.Errorf("no input provided")
+			}
 			return "", fmt.Errorf("failed to read input: %w", err)
 		}
 
