@@ -1,15 +1,18 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/KilimcininKorOglu/poros/internal/config"
 	"github.com/KilimcininKorOglu/poros/internal/output"
 	"github.com/KilimcininKorOglu/poros/internal/trace"
 	"github.com/KilimcininKorOglu/poros/internal/tui"
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 )
 
@@ -69,8 +72,9 @@ Examples:
   poros -v google.com           Verbose table output
   poros --json google.com       JSON output
   poros --tui google.com        Interactive TUI mode
-  poros config --init           Create default config file`,
-	Args:              cobra.ExactArgs(1),
+  poros config --init           Create default config file
+  poros                         Interactive mode (prompts for target)`,
+	Args:              cobra.MaximumNArgs(1),
 	PersistentPreRunE: loadConfig,
 	RunE:              runTrace,
 }
@@ -322,7 +326,18 @@ func runConfig(cmd *cobra.Command, args []string) error {
 }
 
 func runTrace(cmd *cobra.Command, args []string) error {
-	target := args[0]
+	var target string
+
+	// If no target provided, prompt for it interactively
+	if len(args) == 0 {
+		var err error
+		target, err = promptForTarget()
+		if err != nil {
+			return err
+		}
+	} else {
+		target = args[0]
+	}
 
 	// Check for aliases
 	if cfg != nil && cfg.Aliases != nil {
@@ -425,6 +440,67 @@ func runTrace(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+// promptForTarget displays an interactive prompt for the user to enter a target
+func promptForTarget() (string, error) {
+	// Title
+	cyan := color.New(color.FgCyan, color.Bold)
+	green := color.New(color.FgGreen)
+	yellow := color.New(color.FgYellow)
+
+	fmt.Println()
+	cyan.Println("╔═══════════════════════════════════════════════════════════╗")
+	cyan.Println("║         Poros - Modern Network Path Tracer                ║")
+	cyan.Println("╚═══════════════════════════════════════════════════════════╝")
+	fmt.Println()
+
+	// Show some examples
+	fmt.Println("  Examples:")
+	yellow.Println("    • google.com      - Trace to Google")
+	yellow.Println("    • 8.8.8.8         - Trace to Google DNS")
+	yellow.Println("    • cloudflare.com  - Trace to Cloudflare")
+	fmt.Println()
+
+	// Show aliases if any
+	if cfg != nil && len(cfg.Aliases) > 0 {
+		fmt.Println("  Aliases:")
+		for alias, target := range cfg.Aliases {
+			yellow.Printf("    • %s → %s\n", alias, target)
+		}
+		fmt.Println()
+	}
+
+	// Prompt
+	reader := bufio.NewReader(os.Stdin)
+
+	for {
+		green.Print("  Enter target (IP or hostname): ")
+
+		input, err := reader.ReadString('\n')
+		if err != nil {
+			return "", fmt.Errorf("failed to read input: %w", err)
+		}
+
+		// Clean input
+		target := strings.TrimSpace(input)
+
+		// Validate
+		if target == "" {
+			color.Red("  ✗ Target cannot be empty. Please try again.")
+			fmt.Println()
+			continue
+		}
+
+		// Check for quit commands
+		if target == "q" || target == "quit" || target == "exit" {
+			fmt.Println("  Goodbye!")
+			os.Exit(0)
+		}
+
+		fmt.Println()
+		return target, nil
+	}
 }
 
 // Execute runs the root command.
