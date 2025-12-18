@@ -136,7 +136,10 @@ func runTrace(cmd *cobra.Command, args []string) error {
 	config.EnableGeoIP = !noGeoIP && !noEnrich
 
 	// Set probe method
-	if useUDP {
+	if useParis {
+		config.ProbeMethod = trace.ProbeParis
+		config.Paris = true
+	} else if useUDP {
 		config.ProbeMethod = trace.ProbeUDP
 	} else if useTCP {
 		config.ProbeMethod = trace.ProbeTCP

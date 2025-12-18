@@ -50,6 +50,18 @@ func New(config *Config) (*Tracer, error) {
 			Port:    config.DestPort,
 			IPv6:    config.IPv6,
 		})
+	case ProbeParis:
+		// Paris traceroute - determine underlying method
+		var method probe.Method
+		if config.Paris {
+			method = probe.MethodUDP // Default Paris uses UDP
+		}
+		prober, err = probe.NewParisProber(probe.ParisProberConfig{
+			Timeout: config.Timeout,
+			Method:  method,
+			Port:    config.DestPort,
+			IPv6:    config.IPv6,
+		})
 	default:
 		return nil, fmt.Errorf("unknown probe method: %v", config.ProbeMethod)
 	}
