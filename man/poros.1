@@ -1,0 +1,154 @@
+.TH POROS 1 "December 2025" "poros 1.0.0" "User Commands"
+.SH NAME
+poros \- modern, cross-platform network path tracer
+.SH SYNOPSIS
+.B poros
+[\fIOPTIONS\fR] \fITARGET\fR
+.SH DESCRIPTION
+.B Poros
+(Greek: Πόρος - "path, passage") is a modern network path tracer that traces
+the route packets take to reach a destination host. It shows each hop along
+the path with timing information, ASN data, and geographic location.
+.PP
+Features include multiple probe methods (ICMP, UDP, TCP SYN, Paris),
+concurrent probing, ASN/GeoIP enrichment, and interactive TUI mode.
+.SH OPTIONS
+.SS "Probe Methods"
+.TP
+.BR \-I ", " \-\-icmp
+Use ICMP Echo probes (default)
+.TP
+.BR \-U ", " \-\-udp
+Use UDP probes
+.TP
+.BR \-T ", " \-\-tcp
+Use TCP SYN probes
+.TP
+.B \-\-paris
+Use Paris traceroute algorithm (load-balancer friendly)
+.SS "Trace Parameters"
+.TP
+.BR \-m ", " \-\-max\-hops " " \fIN\fR
+Maximum number of hops (default: 30)
+.TP
+.BR \-q ", " \-\-queries " " \fIN\fR
+Number of probes per hop (default: 3)
+.TP
+.BR \-w ", " \-\-timeout " " \fIDURATION\fR
+Probe timeout (default: 3s)
+.TP
+.BR \-f ", " \-\-first\-hop " " \fIN\fR
+Start from specified hop (default: 1)
+.TP
+.B \-\-sequential
+Use sequential mode instead of concurrent
+.SS "Network Settings"
+.TP
+.BR \-4 ", " \-\-ipv4
+Use IPv4 only
+.TP
+.BR \-6 ", " \-\-ipv6
+Use IPv6 only
+.TP
+.BR \-p ", " \-\-port " " \fIPORT\fR
+Destination port for UDP/TCP (default: 33434)
+.TP
+.BR \-i ", " \-\-interface " " \fINAME\fR
+Network interface to use
+.TP
+.BR \-s ", " \-\-source " " \fIIP\fR
+Source IP address
+.SS "Output Formats"
+.TP
+.BR \-v ", " \-\-verbose
+Show detailed table output
+.TP
+.BR \-j ", " \-\-json
+Output in JSON format
+.TP
+.B \-\-csv
+Output in CSV format
+.TP
+.BI \-\-html " FILE"
+Generate HTML report to file
+.TP
+.BR \-t ", " \-\-tui
+Interactive TUI mode
+.TP
+.B \-\-no\-color
+Disable colored output
+.SS "Enrichment"
+.TP
+.B \-\-no\-enrich
+Disable all enrichment
+.TP
+.B \-\-no\-rdns
+Disable reverse DNS lookups
+.TP
+.B \-\-no\-asn
+Disable ASN lookups
+.TP
+.B \-\-no\-geoip
+Disable GeoIP lookups
+.SS "Other"
+.TP
+.BR \-h ", " \-\-help
+Show help message
+.TP
+.B version
+Show version information
+.SH EXAMPLES
+.TP
+Basic ICMP trace:
+.B poros google.com
+.TP
+UDP probe mode:
+.B poros \-U google.com
+.TP
+TCP SYN to port 443:
+.B poros \-T \-p 443 google.com
+.TP
+Paris traceroute:
+.B poros \-\-paris google.com
+.TP
+Verbose table output:
+.B poros \-v google.com
+.TP
+JSON output:
+.B poros \-\-json google.com
+.TP
+Interactive TUI:
+.B poros \-\-tui google.com
+.TP
+HTML report:
+.B poros \-\-html report.html google.com
+.SH PRIVILEGES
+Raw sockets require elevated privileges:
+.TP
+.B Linux
+Run with sudo or set CAP_NET_RAW capability:
+.br
+.B sudo setcap cap_net_raw+ep /path/to/poros
+.TP
+.B macOS
+Run with sudo
+.TP
+.B Windows
+Run as Administrator
+.SH EXIT STATUS
+.TP
+.B 0
+Success
+.TP
+.B 1
+Error (network unreachable, permission denied, etc.)
+.SH AUTHOR
+Written by the Poros contributors.
+.SH REPORTING BUGS
+Report bugs at: https://github.com/KilimcininKorOglu/poros/issues
+.SH SEE ALSO
+.BR traceroute (1),
+.BR mtr (1),
+.BR ping (1)
+.SH COPYRIGHT
+Copyright \(co 2025 Poros contributors. MIT License.
