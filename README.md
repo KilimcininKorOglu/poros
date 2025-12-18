@@ -1,11 +1,11 @@
-# 🔍 Poros
+# Poros
 
 **Poros** (Greek: Πόρος - "path, passage") is a modern, cross-platform network path tracer written in Go.
 
 [![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat&logo=go)](https://go.dev/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-## ✨ Features
+## Features
 
 - **Multiple Probe Methods**: ICMP (default), UDP, TCP SYN, Paris traceroute
 - **Concurrent Probing**: Fast parallel probing for quick results
@@ -14,7 +14,7 @@
 - **Interactive TUI**: Beautiful terminal UI with real-time updates
 - **Cross-Platform**: Linux, macOS, Windows support
 
-## 📦 Installation
+## Installation
 
 ### Using Go
 
@@ -36,7 +36,7 @@ make build
 curl -sSL https://raw.githubusercontent.com/KilimcininKorOglu/poros/master/scripts/install.sh | bash
 ```
 
-## 🚀 Quick Start
+## Quick Start
 
 ```bash
 # Basic trace using ICMP
@@ -64,7 +64,7 @@ poros --html report.html google.com
 poros --paris google.com
 ```
 
-## 📋 Command Line Options
+## Command Line Options
 
 ```
 Usage:
@@ -105,7 +105,7 @@ Enrichment:
       --no-geoip       Disable GeoIP lookups
 ```
 
-## 📊 Output Examples
+## Output Examples
 
 ### Classic Text Output
 ```
@@ -142,7 +142,7 @@ Trace complete. 4 hops, 12.31 ms total
 }
 ```
 
-## 🔧 Requirements
+## Requirements
 
 - **Go 1.21+** (for building from source)
 - **Root/Administrator privileges** for raw socket access
@@ -155,7 +155,7 @@ Trace complete. 4 hops, 12.31 ms total
 | macOS | `sudo` | Required for ICMP |
 | Windows | Run as Administrator | Required for raw sockets |
 
-## 🛠️ Development
+## Development
 
 ```bash
 # Build
@@ -177,19 +177,19 @@ make lint
 make fmt
 ```
 
-## 📖 Documentation
+## Documentation
 
 For detailed documentation, see the [docs](docs/) directory.
 
-## 🤝 Contributing
+## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - Inspired by traditional `traceroute` and `mtr`
 - Built with [Cobra](https://github.com/spf13/cobra) for CLI
