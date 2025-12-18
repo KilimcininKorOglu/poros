@@ -185,11 +185,11 @@
 | T088 | Add HTML CLI Flag | ✅ COMPLETED | P1 |
 | T089 | Add HTML Report Tests | ✅ COMPLETED | P2 |
 
-### F014: Release and Packaging (v1.0.0) ⏳
+### F014: Release and Packaging (v1.0.0) ✅
 | Task ID | Task Name | Status | Priority |
 |---------|-----------|--------|----------|
-| T090 | Configure GoReleaser | ⏳ NOT_STARTED | P1 |
-| T091 | Set Up GitHub Actions CI | ⏳ NOT_STARTED | P1 |
+| T090 | Configure GoReleaser | ⏳ SKIPPED (using release.yml) | P1 |
+| T091 | Set Up GitHub Actions CI | ✅ COMPLETED | P1 |
 | T092 | Create Homebrew Formula | ⏳ NOT_STARTED | P2 |
 | T093 | Create AUR Package | ⏳ NOT_STARTED | P3 |
 | T094 | Create Docker Image | ⏳ NOT_STARTED | P3 |
@@ -217,9 +217,10 @@
 
 ## Current Sprint Focus
 **Release Preparation**
-- [ ] T090: GoReleaser configuration
-- [ ] T091: GitHub Actions CI
+- [x] T090: GoReleaser configuration (using release.yml instead)
+- [x] T091: GitHub Actions CI ✅
 - [ ] T092: Homebrew formula (optional)
+- [ ] T094: Docker image (optional)
 
 ## Blocked Tasks
 *No blocked tasks currently*
@@ -234,6 +235,8 @@
 ## Recent Commits
 | Commit | Task | Date |
 |--------|------|------|
+| 16fb36d | T091 GitHub Actions CI | 2025-12-18 |
+| b0154fd | T075 Platform Docs | 2025-12-18 |
 | 6c80c21 | F014 Release Packaging | 2025-12-18 |
 | 45514b7 | F013 HTML Report | 2025-12-18 |
 | 8b07fdb | F012 TUI Interface | 2025-12-18 |

@@ -1,0 +1,35 @@
+# Git
+.git
+.gitignore
+
+# Build artifacts
+bin/
+*.exe
+poros
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Documentation (not needed in image)
+docs/
+tasks/
+*.md
+!README.md
+
+# CI/CD
+.github/
+
+# Development files
+CLAUDE.md
+prd.md
+coverage.out
+coverage.html
+
+# Data files
+data/
+
+# Test files
+*_test.go
