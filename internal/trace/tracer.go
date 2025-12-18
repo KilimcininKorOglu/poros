@@ -7,13 +7,15 @@ import (
 	"net"
 	"time"
 
+	"github.com/KilimcininKorOglu/poros/internal/enrich"
 	"github.com/KilimcininKorOglu/poros/internal/probe"
 )
 
 // Tracer performs network path tracing operations.
 type Tracer struct {
-	config *Config
-	prober probe.Prober
+	config   *Config
+	prober   probe.Prober
+	enricher *enrich.Enricher
 }
 
 // New creates a new Tracer with the given configuration.
@@ -53,9 +55,20 @@ func New(config *Config) (*Tracer, error) {
 		return nil, fmt.Errorf("failed to create prober: %w", err)
 	}
 
+	// Create enricher if enabled
+	var enricher *enrich.Enricher
+	if config.EnableEnrichment {
+		enricher = enrich.NewEnricher(enrich.EnricherConfig{
+			EnableRDNS:  config.EnableRDNS,
+			EnableASN:   config.EnableASN,
+			EnableGeoIP: config.EnableGeoIP,
+		})
+	}
+
 	return &Tracer{
-		config: config,
-		prober: prober,
+		config:   config,
+		prober:   prober,
+		enricher: enricher,
 	}, nil
 }
 
@@ -79,14 +92,67 @@ func (t *Tracer) Trace(ctx context.Context, target string) (*TraceResult, error)
 		return nil, err
 	}
 
+	// Enrich hops with rDNS, ASN, GeoIP
+	if t.enricher != nil {
+		// Collect IPs from hops
+		ips := make([]net.IP, 0, len(hops))
+		for _, hop := range hops {
+			if hop.IP != nil {
+				ips = append(ips, hop.IP)
+			}
+		}
+
+		// Get enrichment results
+		enrichResults := t.enricher.EnrichIPs(ctx, ips)
+
+		// Apply results to hops
+		for i := range hops {
+			if hops[i].IP != nil {
+				if result := enrichResults[hops[i].IP.String()]; result != nil {
+					hops[i].Hostname = result.Hostname
+					if result.ASN != nil {
+						hops[i].ASN = &ASNInfo{
+							Number:  result.ASN.Number,
+							Org:     result.ASN.Org,
+							Country: result.ASN.Country,
+						}
+					}
+					if result.Geo != nil {
+						hops[i].Geo = &GeoInfo{
+							Country:     result.Geo.Country,
+							CountryCode: result.Geo.CountryCode,
+							City:        result.Geo.City,
+							Latitude:    result.Geo.Latitude,
+							Longitude:   result.Geo.Longitude,
+						}
+					}
+				}
+			}
+		}
+	}
+
 	// Build and return the result
 	return t.buildResult(target, dest, hops), nil
 }
 
 // Close releases resources held by the tracer.
 func (t *Tracer) Close() error {
+	var errs []error
+
 	if t.prober != nil {
-		return t.prober.Close()
+		if err := t.prober.Close(); err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	if t.enricher != nil {
+		if err := t.enricher.Close(); err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	if len(errs) > 0 {
+		return errs[0]
 	}
 	return nil
 }

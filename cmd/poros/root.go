@@ -129,6 +129,12 @@ func runTrace(cmd *cobra.Command, args []string) error {
 	config.IPv6 = forceIPv6
 	config.DestPort = destPort
 
+	// Configure enrichment
+	config.EnableEnrichment = !noEnrich
+	config.EnableRDNS = !noRDNS && !noEnrich
+	config.EnableASN = !noASN && !noEnrich
+	config.EnableGeoIP = !noGeoIP && !noEnrich
+
 	// Set probe method
 	if useUDP {
 		config.ProbeMethod = trace.ProbeUDP
