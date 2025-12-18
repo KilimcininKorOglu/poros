@@ -26,23 +26,26 @@ const (
 // Model is the Bubble Tea model for the traceroute TUI.
 type Model struct {
 	// Configuration
-	target  string
-	config  *trace.Config
-	tracer  *trace.Tracer
-	width   int
-	height  int
+	target string
+	config *trace.Config
+	width  int
+	height int
 
 	// State
-	state   State
-	hops    []trace.Hop
-	err     error
-	elapsed time.Duration
+	state     State
+	hops      []trace.Hop
+	err       error
+	elapsed   time.Duration
+	startTime time.Time
 
 	// UI components
 	spinner spinner.Model
 
 	// Styles
 	styles Styles
+
+	// Channel for hop updates
+	hopChan chan trace.Hop
 }
 
 // HopMsg is sent when a new hop is discovered.
@@ -65,26 +68,24 @@ type TickMsg time.Time
 
 // New creates a new TUI model.
 func New(target string, config *trace.Config) (*Model, error) {
-	tracer, err := trace.New(config)
-	if err != nil {
-		return nil, err
-	}
-
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 
-	return &Model{
-		target:  target,
-		config:  config,
-		tracer:  tracer,
-		state:   StateRunning,
-		hops:    make([]trace.Hop, 0),
-		spinner: s,
-		styles:  DefaultStyles(),
-		width:   80,
-		height:  24,
-	}, nil
+	m := &Model{
+		target:    target,
+		config:    config,
+		state:     StateRunning,
+		hops:      make([]trace.Hop, 0),
+		spinner:   s,
+		styles:    DefaultStyles(),
+		width:     80,
+		height:    24,
+		startTime: time.Now(),
+		hopChan:   make(chan trace.Hop, 100),
+	}
+
+	return m, nil
 }
 
 // Init implements tea.Model.
@@ -93,6 +94,7 @@ func (m Model) Init() tea.Cmd {
 		m.spinner.Tick,
 		m.runTrace(),
 		m.tickCmd(),
+		m.waitForHop(),
 	)
 }
 
@@ -115,17 +117,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 
 	case TickMsg:
-		m.elapsed = time.Since(time.Time(msg))
+		m.elapsed = time.Since(m.startTime)
 		if m.state == StateRunning {
 			return m, m.tickCmd()
 		}
 
 	case HopMsg:
 		m.hops = append(m.hops, msg.Hop)
+		// Continue waiting for more hops
+		return m, m.waitForHop()
 
 	case CompleteMsg:
 		m.state = StateComplete
-		m.hops = msg.Result.Hops
+		// Don't replace hops - they've been added via HopMsg
 
 	case ErrorMsg:
 		m.state = StateError
@@ -280,12 +284,35 @@ func (m Model) renderFooter() string {
 // runTrace runs the traceroute in the background.
 func (m Model) runTrace() tea.Cmd {
 	return func() tea.Msg {
+		// Set up OnHop callback to stream hops to channel
+		m.config.OnHop = func(hop *trace.Hop) {
+			m.hopChan <- *hop
+		}
+
+		// Create tracer with callback
+		tracer, err := trace.New(m.config)
+		if err != nil {
+			return ErrorMsg{Err: err}
+		}
+		defer tracer.Close()
+
 		ctx := context.Background()
-		result, err := m.tracer.Trace(ctx, m.target)
+		result, err := tracer.Trace(ctx, m.target)
 		if err != nil {
 			return ErrorMsg{Err: err}
 		}
 		return CompleteMsg{Result: result}
+	}
+}
+
+// waitForHop waits for a hop from the channel.
+func (m Model) waitForHop() tea.Cmd {
+	return func() tea.Msg {
+		hop, ok := <-m.hopChan
+		if !ok {
+			return nil
+		}
+		return HopMsg{Hop: hop}
 	}
 }
 
@@ -298,8 +325,8 @@ func (m Model) tickCmd() tea.Cmd {
 
 // Close releases resources.
 func (m *Model) Close() error {
-	if m.tracer != nil {
-		return m.tracer.Close()
+	if m.hopChan != nil {
+		close(m.hopChan)
 	}
 	return nil
 }
