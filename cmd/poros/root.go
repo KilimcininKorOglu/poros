@@ -6,6 +6,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/KilimcininKorOglu/poros/internal/config"
 	"github.com/KilimcininKorOglu/poros/internal/output"
 	"github.com/KilimcininKorOglu/poros/internal/trace"
 	"github.com/KilimcininKorOglu/poros/internal/tui"
@@ -38,6 +39,10 @@ var (
 	noASN       bool
 	noGeoIP     bool
 	noColor     bool
+
+	// Config file
+	cfgFile string
+	cfg     *config.Config
 )
 
 var rootCmd = &cobra.Command{
@@ -55,6 +60,7 @@ Features:
   • ASN and GeoIP enrichment
   • Interactive TUI mode
   • Multiple output formats: text, JSON, CSV, HTML
+  • Configuration file support (~/.config/poros/config.yaml)
 
 Examples:
   poros google.com              Basic trace using ICMP
@@ -62,12 +68,17 @@ Examples:
   poros -T --port 443 host      TCP probe to port 443
   poros -v google.com           Verbose table output
   poros --json google.com       JSON output
-  poros --tui google.com        Interactive TUI mode`,
-	Args: cobra.ExactArgs(1),
-	RunE: runTrace,
+  poros --tui google.com        Interactive TUI mode
+  poros config --init           Create default config file`,
+	Args:              cobra.ExactArgs(1),
+	PersistentPreRunE: loadConfig,
+	RunE:              runTrace,
 }
 
 func init() {
+	// Config file flag
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "Config file (default: ~/.config/poros/config.yaml)")
+
 	// Probe method flags
 	rootCmd.Flags().BoolVarP(&useICMP, "icmp", "I", false, "Use ICMP Echo probes (default)")
 	rootCmd.Flags().BoolVarP(&useUDP, "udp", "U", false, "Use UDP probes")
@@ -75,10 +86,10 @@ func init() {
 	rootCmd.Flags().BoolVar(&useParis, "paris", false, "Use Paris traceroute algorithm")
 
 	// Trace parameters
-	rootCmd.Flags().IntVarP(&maxHops, "max-hops", "m", 30, "Maximum number of hops")
-	rootCmd.Flags().IntVarP(&probeCount, "queries", "q", 3, "Number of probes per hop")
-	rootCmd.Flags().DurationVarP(&timeout, "timeout", "w", 3*time.Second, "Probe timeout")
-	rootCmd.Flags().IntVarP(&firstHop, "first-hop", "f", 1, "Start from specified hop")
+	rootCmd.Flags().IntVarP(&maxHops, "max-hops", "m", 0, "Maximum number of hops")
+	rootCmd.Flags().IntVarP(&probeCount, "queries", "q", 0, "Number of probes per hop")
+	rootCmd.Flags().DurationVarP(&timeout, "timeout", "w", 0, "Probe timeout")
+	rootCmd.Flags().IntVarP(&firstHop, "first-hop", "f", 0, "Start from specified hop")
 	rootCmd.Flags().BoolVar(&sequential, "sequential", false, "Use sequential mode (slower but reliable)")
 
 	// Network settings
@@ -86,7 +97,7 @@ func init() {
 	rootCmd.Flags().BoolVarP(&forceIPv6, "ipv6", "6", false, "Use IPv6 only")
 	rootCmd.Flags().StringVarP(&ifaceName, "interface", "i", "", "Network interface to use")
 	rootCmd.Flags().StringVarP(&sourceIP, "source", "s", "", "Source IP address")
-	rootCmd.Flags().IntVarP(&destPort, "port", "p", 33434, "Destination port (UDP/TCP)")
+	rootCmd.Flags().IntVarP(&destPort, "port", "p", 0, "Destination port (UDP/TCP)")
 
 	// Output flags
 	rootCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Show detailed table output")
@@ -102,8 +113,135 @@ func init() {
 	rootCmd.Flags().BoolVar(&noASN, "no-asn", false, "Disable ASN lookups")
 	rootCmd.Flags().BoolVar(&noGeoIP, "no-geoip", false, "Disable GeoIP lookups")
 
-	// Version command
+	// Add subcommands
 	rootCmd.AddCommand(versionCmd)
+	rootCmd.AddCommand(configCmd)
+}
+
+// loadConfig loads configuration from file and applies defaults
+func loadConfig(cmd *cobra.Command, args []string) error {
+	var err error
+
+	if cfgFile != "" {
+		cfg, err = config.LoadFrom(cfgFile)
+	} else {
+		cfg, err = config.Load()
+	}
+
+	if err != nil {
+		// If config file specified but not found, error
+		if cfgFile != "" {
+			return fmt.Errorf("failed to load config: %w", err)
+		}
+		// Otherwise use defaults
+		cfg = config.DefaultConfig()
+	}
+
+	// Apply config defaults if flags not explicitly set
+	applyConfigDefaults(cmd)
+
+	return nil
+}
+
+// applyConfigDefaults applies config file values for unset flags
+func applyConfigDefaults(cmd *cobra.Command) {
+	if cfg == nil {
+		return
+	}
+
+	defaults := cfg.Defaults
+
+	// Output mode from config (if no flag set)
+	if !cmd.Flags().Changed("tui") && defaults.TUI {
+		tuiMode = true
+	}
+	if !cmd.Flags().Changed("verbose") && defaults.Verbose {
+		verbose = true
+	}
+	if !cmd.Flags().Changed("json") && defaults.JSON {
+		jsonOutput = true
+	}
+	if !cmd.Flags().Changed("csv") && defaults.CSV {
+		csvOutput = true
+	}
+	if !cmd.Flags().Changed("no-color") && defaults.NoColor {
+		noColor = true
+	}
+
+	// Probe method from config
+	if !cmd.Flags().Changed("paris") && defaults.Paris {
+		useParis = true
+	}
+	if !cmd.Flags().Changed("icmp") && !cmd.Flags().Changed("udp") && !cmd.Flags().Changed("tcp") {
+		switch defaults.ProbeMethod {
+		case "udp":
+			useUDP = true
+		case "tcp":
+			useTCP = true
+		}
+	}
+
+	// Trace parameters from config
+	if !cmd.Flags().Changed("max-hops") {
+		if defaults.MaxHops > 0 {
+			maxHops = defaults.MaxHops
+		} else {
+			maxHops = 30
+		}
+	}
+	if !cmd.Flags().Changed("queries") {
+		if defaults.Queries > 0 {
+			probeCount = defaults.Queries
+		} else {
+			probeCount = 3
+		}
+	}
+	if !cmd.Flags().Changed("timeout") {
+		if defaults.Timeout > 0 {
+			timeout = defaults.Timeout
+		} else {
+			timeout = 3 * time.Second
+		}
+	}
+	if !cmd.Flags().Changed("first-hop") {
+		if defaults.FirstHop > 0 {
+			firstHop = defaults.FirstHop
+		} else {
+			firstHop = 1
+		}
+	}
+	if !cmd.Flags().Changed("sequential") && defaults.Sequential {
+		sequential = true
+	}
+
+	// Network settings from config
+	if !cmd.Flags().Changed("ipv4") && defaults.IPv4 {
+		forceIPv4 = true
+	}
+	if !cmd.Flags().Changed("ipv6") && defaults.IPv6 {
+		forceIPv6 = true
+	}
+	if !cmd.Flags().Changed("port") {
+		if defaults.Port > 0 {
+			destPort = defaults.Port
+		} else {
+			destPort = 33434
+		}
+	}
+
+	// Enrichment from config
+	if !defaults.Enrichment.Enabled {
+		noEnrich = true
+	}
+	if !cmd.Flags().Changed("no-rdns") && !defaults.Enrichment.RDNS {
+		noRDNS = true
+	}
+	if !cmd.Flags().Changed("no-asn") && !defaults.Enrichment.ASN {
+		noASN = true
+	}
+	if !cmd.Flags().Changed("no-geoip") && !defaults.Enrichment.GeoIP {
+		noGeoIP = true
+	}
 }
 
 var versionCmd = &cobra.Command{
@@ -113,48 +251,115 @@ var versionCmd = &cobra.Command{
 		fmt.Printf("Poros %s\n", version)
 		fmt.Printf("  Commit: %s\n", commit)
 		fmt.Printf("  Built:  %s\n", date)
+		fmt.Printf("  Config: %s\n", config.GetConfigPath())
 	},
+}
+
+var configCmd = &cobra.Command{
+	Use:   "config",
+	Short: "Manage configuration",
+	Long: `Manage Poros configuration file.
+
+Commands:
+  poros config --init     Create default config file
+  poros config --show     Show current configuration
+  poros config --path     Show config file path`,
+	RunE: runConfig,
+}
+
+var (
+	configInit bool
+	configShow bool
+	configPath bool
+)
+
+func init() {
+	configCmd.Flags().BoolVar(&configInit, "init", false, "Create default config file")
+	configCmd.Flags().BoolVar(&configShow, "show", false, "Show current configuration")
+	configCmd.Flags().BoolVar(&configPath, "path", false, "Show config file path")
+}
+
+func runConfig(cmd *cobra.Command, args []string) error {
+	if configPath {
+		fmt.Println(config.GetConfigPath())
+		return nil
+	}
+
+	if configInit {
+		path := config.GetConfigPath()
+		
+		// Check if file already exists
+		if _, err := os.Stat(path); err == nil {
+			return fmt.Errorf("config file already exists: %s", path)
+		}
+
+		// Create default config
+		cfg := config.DefaultConfig()
+		if err := cfg.Save(); err != nil {
+			return fmt.Errorf("failed to create config: %w", err)
+		}
+
+		fmt.Printf("Created config file: %s\n", path)
+		fmt.Println("\nEdit this file to customize defaults.")
+		fmt.Println("Example: Set 'tui: true' under 'defaults:' to always use TUI mode.")
+		return nil
+	}
+
+	if configShow {
+		fmt.Println(config.GenerateExample())
+		return nil
+	}
+
+	// No flag specified, show help
+	return cmd.Help()
 }
 
 func runTrace(cmd *cobra.Command, args []string) error {
 	target := args[0]
 
+	// Check for aliases
+	if cfg != nil && cfg.Aliases != nil {
+		if alias, ok := cfg.Aliases[target]; ok {
+			target = alias
+		}
+	}
+
 	// Build tracer configuration
-	config := trace.DefaultConfig()
-	config.MaxHops = maxHops
-	config.ProbeCount = probeCount
-	config.Timeout = timeout
-	config.FirstHop = firstHop
-	config.Sequential = sequential
-	config.IPv4 = forceIPv4
-	config.IPv6 = forceIPv6
-	config.DestPort = destPort
+	traceConfig := trace.DefaultConfig()
+	traceConfig.MaxHops = maxHops
+	traceConfig.ProbeCount = probeCount
+	traceConfig.Timeout = timeout
+	traceConfig.FirstHop = firstHop
+	traceConfig.Sequential = sequential
+	traceConfig.IPv4 = forceIPv4
+	traceConfig.IPv6 = forceIPv6
+	traceConfig.DestPort = destPort
 
 	// Configure enrichment
-	config.EnableEnrichment = !noEnrich
-	config.EnableRDNS = !noRDNS && !noEnrich
-	config.EnableASN = !noASN && !noEnrich
-	config.EnableGeoIP = !noGeoIP && !noEnrich
+	traceConfig.EnableEnrichment = !noEnrich
+	traceConfig.EnableRDNS = !noRDNS && !noEnrich
+	traceConfig.EnableASN = !noASN && !noEnrich
+	traceConfig.EnableGeoIP = !noGeoIP && !noEnrich
 
 	// Set probe method
 	if useParis {
-		config.ProbeMethod = trace.ProbeParis
-		config.Paris = true
+		traceConfig.ProbeMethod = trace.ProbeParis
+		traceConfig.Paris = true
 	} else if useUDP {
-		config.ProbeMethod = trace.ProbeUDP
+		traceConfig.ProbeMethod = trace.ProbeUDP
 	} else if useTCP {
-		config.ProbeMethod = trace.ProbeTCP
+		traceConfig.ProbeMethod = trace.ProbeTCP
 	} else {
-		config.ProbeMethod = trace.ProbeICMP
+		traceConfig.ProbeMethod = trace.ProbeICMP
 	}
 
 	// If TUI mode requested, run TUI
 	if tuiMode {
-		return tui.Run(target, config)
+		return tui.Run(target, traceConfig)
 	}
 
 	// Create tracer
-	tracer, err := trace.New(config)
+	tracer, err := trace.New(traceConfig)
 	if err != nil {
 		return fmt.Errorf("failed to create tracer: %w", err)
 	}
