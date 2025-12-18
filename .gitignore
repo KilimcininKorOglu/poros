@@ -1,6 +1,10 @@
 # PRD document (internal)
 prd.md
 
+# AI agent docs (local only)
+CLAUDE.md
+AGENTS.md
+
 # GeoIP databases
 data/
 *.mmdb
