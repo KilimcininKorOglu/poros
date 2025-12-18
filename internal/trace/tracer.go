@@ -45,8 +45,11 @@ func New(config *Config) (*Tracer, error) {
 			IPv6:     config.IPv6,
 		})
 	case ProbeTCP:
-		// TODO: Implement TCP prober
-		return nil, fmt.Errorf("TCP probe not yet implemented")
+		prober, err = probe.NewTCPProber(probe.TCPProberConfig{
+			Timeout: config.Timeout,
+			Port:    config.DestPort,
+			IPv6:    config.IPv6,
+		})
 	default:
 		return nil, fmt.Errorf("unknown probe method: %v", config.ProbeMethod)
 	}
