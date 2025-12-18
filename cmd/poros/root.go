@@ -119,22 +119,29 @@ func init() {
 }
 
 // loadConfig loads configuration from file and applies defaults
+// If no config file exists, it creates one automatically on first run
 func loadConfig(cmd *cobra.Command, args []string) error {
 	var err error
 
 	if cfgFile != "" {
+		// Custom config file specified
 		cfg, err = config.LoadFrom(cfgFile)
-	} else {
-		cfg, err = config.Load()
-	}
-
-	if err != nil {
-		// If config file specified but not found, error
-		if cfgFile != "" {
+		if err != nil {
 			return fmt.Errorf("failed to load config: %w", err)
 		}
-		// Otherwise use defaults
-		cfg = config.DefaultConfig()
+	} else {
+		// Try to load from default locations
+		cfg, err = config.Load()
+		if err != nil {
+			// Config file doesn't exist, create it automatically
+			cfg = config.DefaultConfig()
+			
+			// Try to save default config (ignore errors - might not have write permission)
+			if saveErr := cfg.Save(); saveErr == nil {
+				fmt.Fprintf(os.Stderr, "Created default config: %s\n", config.GetConfigPath())
+				fmt.Fprintf(os.Stderr, "Edit this file to customize defaults (e.g., set tui: true)\n\n")
+			}
+		}
 	}
 
 	// Apply config defaults if flags not explicitly set

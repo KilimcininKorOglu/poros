@@ -2,6 +2,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -86,13 +87,16 @@ func DefaultConfig() *Config {
 	}
 }
 
+// ErrConfigNotFound is returned when no config file exists.
+var ErrConfigNotFound = fmt.Errorf("config file not found")
+
 // Load reads configuration from the default config file locations.
 // It searches in order:
 //  1. ./poros.yaml (current directory)
 //  2. ~/.config/poros/config.yaml (Linux/macOS)
 //  3. %APPDATA%\poros\config.yaml (Windows)
 //
-// If no config file is found, returns default configuration.
+// If no config file is found, returns ErrConfigNotFound.
 func Load() (*Config, error) {
 	paths := getConfigPaths()
 
@@ -102,8 +106,8 @@ func Load() (*Config, error) {
 		}
 	}
 
-	// No config file found, return defaults
-	return DefaultConfig(), nil
+	// No config file found
+	return nil, ErrConfigNotFound
 }
 
 // LoadFrom reads configuration from a specific file path.
