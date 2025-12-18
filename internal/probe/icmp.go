@@ -3,6 +3,7 @@ package probe
 import (
 	"context"
 	"encoding/binary"
+	"fmt"
 	"net"
 	"os"
 	"sync/atomic"
@@ -51,19 +52,13 @@ func NewICMPProber(config ICMPProberConfig) (*ICMPProber, error) {
 	if config.IPv6 {
 		p.conn6, err = icmp.ListenPacket("ip6:ipv6-icmp", "::")
 		if err != nil {
-			// Try unprivileged mode
-			p.conn6, err = icmp.ListenPacket("udp6", "::")
+			return nil, fmt.Errorf("failed to create ICMPv6 socket (run as Administrator on Windows, or use sudo on Unix): %w", err)
 		}
 	} else {
 		p.conn4, err = icmp.ListenPacket("ip4:icmp", "0.0.0.0")
 		if err != nil {
-			// Try unprivileged mode on non-Linux
-			p.conn4, err = icmp.ListenPacket("udp4", "0.0.0.0")
+			return nil, fmt.Errorf("failed to create ICMP socket (run as Administrator on Windows, or use sudo on Unix): %w", err)
 		}
-	}
-
-	if err != nil {
-		return nil, err
 	}
 
 	return p, nil

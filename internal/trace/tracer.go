@@ -96,11 +96,20 @@ func (t *Tracer) Trace(ctx context.Context, target string) (*TraceResult, error)
 	}
 
 	// Perform the trace
+	// Note: ICMP concurrent mode has issues with shared socket on Windows,
+	// so we use sequential mode for ICMP by default unless explicitly requested
 	var hops []Hop
-	if t.config.Sequential {
-		hops, err = t.traceSequential(ctx, dest)
-	} else {
+	useConcurrent := !t.config.Sequential
+	if useConcurrent && t.config.ProbeMethod == ProbeICMP {
+		// ICMP concurrent mode is problematic on Windows due to shared socket
+		// responses getting mixed up between goroutines
+		useConcurrent = false
+	}
+	
+	if useConcurrent {
 		hops, err = t.traceConcurrent(ctx, dest)
+	} else {
+		hops, err = t.traceSequential(ctx, dest)
 	}
 
 	if err != nil {
