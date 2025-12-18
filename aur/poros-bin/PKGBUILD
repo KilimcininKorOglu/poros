@@ -1,0 +1,29 @@
+# Maintainer: Your Name <your.email@example.com>
+# AUR Binary Package for Poros - Modern Network Path Tracer
+
+pkgname=poros-bin
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="Modern, cross-platform network path tracer with TUI support (prebuilt binary)"
+arch=('x86_64' 'aarch64')
+url="https://github.com/KilimcininKorOglu/poros"
+license=('MIT')
+depends=('glibc')
+optdepends=('libcap: for running without root via capabilities')
+provides=('poros')
+conflicts=('poros' 'poros-git')
+source_x86_64=("https://github.com/KilimcininKorOglu/poros/releases/download/v${pkgver}/poros-linux-amd64.tar.gz")
+source_aarch64=("https://github.com/KilimcininKorOglu/poros/releases/download/v${pkgver}/poros-linux-arm64.tar.gz")
+sha256sums_x86_64=('SKIP')  # Update with actual checksum
+sha256sums_aarch64=('SKIP')  # Update with actual checksum
+
+package() {
+    # Install binary
+    install -Dm755 poros-linux-* "${pkgdir}/usr/bin/poros" 2>/dev/null || \
+    install -Dm755 poros "${pkgdir}/usr/bin/poros"
+}
+
+post_install() {
+    echo "To use poros without root, set capabilities:"
+    echo "  sudo setcap cap_net_raw+ep /usr/bin/poros"
+}
