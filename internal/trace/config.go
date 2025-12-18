@@ -60,12 +60,13 @@ type Config struct {
 	PacketsPerSecond int // Rate limit (0 = unlimited)
 
 	// Enrichment settings
-	EnableEnrichment bool   // Enable any enrichment
-	EnableRDNS       bool   // Enable reverse DNS lookup
-	EnableASN        bool   // Enable ASN lookup
-	EnableGeoIP      bool   // Enable GeoIP lookup
-	ASNDBPath        string // Path to MaxMind ASN database
-	GeoDBPath        string // Path to MaxMind GeoIP database
+	EnableEnrichment bool // Enable any enrichment
+	EnableRDNS       bool // Enable reverse DNS lookup
+	EnableASN        bool // Enable ASN lookup
+	EnableGeoIP      bool // Enable GeoIP lookup
+
+	// MaxMind database (optional, for offline/faster lookups)
+	MaxMindDB interface{} // *enrich.MaxMindDB - use interface to avoid import cycle
 
 	// Callback for real-time hop updates (streaming output)
 	OnHop func(hop *Hop) // Called after each hop is probed

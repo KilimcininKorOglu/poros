@@ -73,11 +73,22 @@ func New(config *Config) (*Tracer, error) {
 	// Create enricher if enabled
 	var enricher *enrich.Enricher
 	if config.EnableEnrichment {
-		enricher = enrich.NewEnricher(enrich.EnricherConfig{
+		enricherConfig := enrich.EnricherConfig{
 			EnableRDNS:  config.EnableRDNS,
 			EnableASN:   config.EnableASN,
 			EnableGeoIP: config.EnableGeoIP,
-		})
+		}
+
+		// Use MaxMind if provided
+		if config.MaxMindDB != nil {
+			if maxmindDB, ok := config.MaxMindDB.(*enrich.MaxMindDB); ok {
+				enricher = enrich.NewEnricherWithMaxMind(enricherConfig, maxmindDB)
+			} else {
+				enricher = enrich.NewEnricher(enricherConfig)
+			}
+		} else {
+			enricher = enrich.NewEnricher(enricherConfig)
+		}
 	}
 
 	return &Tracer{

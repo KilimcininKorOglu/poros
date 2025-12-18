@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/KilimcininKorOglu/poros/internal/config"
+	"github.com/KilimcininKorOglu/poros/internal/enrich"
 	"github.com/KilimcininKorOglu/poros/internal/output"
 	"github.com/KilimcininKorOglu/poros/internal/trace"
 	"github.com/KilimcininKorOglu/poros/internal/tui"
@@ -363,6 +364,17 @@ func runTrace(cmd *cobra.Command, args []string) error {
 	traceConfig.EnableASN = !noASN && !noEnrich
 	traceConfig.EnableGeoIP = !noGeoIP && !noEnrich
 
+	// Initialize MaxMind if enabled in config
+	if cfg != nil && cfg.MaxMind.Enabled && cfg.MaxMind.LicenseKey != "" {
+		maxmindDB, err := initMaxMind(cfg)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: MaxMind initialization failed: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Falling back to online APIs...\n\n")
+		} else if maxmindDB != nil {
+			traceConfig.MaxMindDB = maxmindDB
+		}
+	}
+
 	// Set probe method
 	if useParis {
 		traceConfig.ProbeMethod = trace.ProbeParis
@@ -526,6 +538,60 @@ func promptForTarget() (string, error) {
 		fmt.Println()
 		return target, nil
 	}
+}
+
+// initMaxMind initializes MaxMind database, downloading if necessary.
+func initMaxMind(cfg *config.Config) (*enrich.MaxMindDB, error) {
+	if !cfg.MaxMind.Enabled || cfg.MaxMind.LicenseKey == "" {
+		return nil, nil
+	}
+
+	asnPath := config.GetASNDBPath()
+	geoPath := config.GetGeoDBPath()
+
+	maxmindConfig := enrich.MaxMindDBConfig{
+		LicenseKey: cfg.MaxMind.LicenseKey,
+		ASNDBPath:  asnPath,
+		GeoDBPath:  geoPath,
+	}
+
+	// Try to open existing databases
+	db, err := enrich.NewMaxMindDB(maxmindConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	// Check if we need to update
+	if cfg.MaxMind.UpdateHours > 0 {
+		maxAge := time.Duration(cfg.MaxMind.UpdateHours) * time.Hour
+		if db.NeedsUpdate(maxAge) {
+			fmt.Fprintf(os.Stderr, "Updating MaxMind databases...\n")
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+			defer cancel()
+
+			if err := db.DownloadDatabases(ctx); err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: Failed to update databases: %v\n", err)
+				// Continue with existing databases if available
+			} else {
+				fmt.Fprintf(os.Stderr, "MaxMind databases updated successfully.\n\n")
+			}
+		}
+	}
+
+	// If no databases available, try to download
+	if !db.HasASN() && !db.HasGeo() {
+		fmt.Fprintf(os.Stderr, "Downloading MaxMind databases (first run)...\n")
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
+
+		if err := db.DownloadDatabases(ctx); err != nil {
+			db.Close()
+			return nil, fmt.Errorf("failed to download databases: %w", err)
+		}
+		fmt.Fprintf(os.Stderr, "MaxMind databases downloaded successfully.\n\n")
+	}
+
+	return db, nil
 }
 
 // Execute runs the root command.

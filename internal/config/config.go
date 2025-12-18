@@ -16,6 +16,9 @@ type Config struct {
 	// Defaults are applied when flags are not specified
 	Defaults Defaults `yaml:"defaults"`
 
+	// MaxMind GeoLite2 database settings
+	MaxMind MaxMindConfig `yaml:"maxmind"`
+
 	// Aliases for common targets
 	Aliases map[string]string `yaml:"aliases,omitempty"`
 }
@@ -57,6 +60,13 @@ type EnrichmentConfig struct {
 	GeoIP   bool `yaml:"geoip"`
 }
 
+// MaxMindConfig holds MaxMind GeoLite2 database settings.
+type MaxMindConfig struct {
+	Enabled     bool   `yaml:"enabled"`      // Enable MaxMind databases
+	LicenseKey  string `yaml:"license_key"`  // MaxMind license key (free registration)
+	UpdateHours int    `yaml:"update_hours"` // Auto-update interval in hours (0 = no auto-update)
+}
+
 // DefaultConfig returns a Config with default values.
 func DefaultConfig() *Config {
 	return &Config{
@@ -84,6 +94,11 @@ func DefaultConfig() *Config {
 			},
 		},
 		Aliases: make(map[string]string),
+		MaxMind: MaxMindConfig{
+			Enabled:     false,
+			LicenseKey:  "",
+			UpdateHours: 24, // Default: check for updates every 24 hours
+		},
 	}
 }
 
@@ -203,6 +218,35 @@ func GetConfigPath() string {
 	return getUserConfigPath()
 }
 
+// GetConfigDir returns the directory where config and data files are stored.
+func GetConfigDir() string {
+	path := getUserConfigPath()
+	if path == "" {
+		return ""
+	}
+	return filepath.Dir(path)
+}
+
+// GetMaxMindDBPath returns the path for a MaxMind database file.
+// Databases are stored alongside the config file.
+func GetMaxMindDBPath(dbName string) string {
+	dir := GetConfigDir()
+	if dir == "" {
+		return ""
+	}
+	return filepath.Join(dir, dbName)
+}
+
+// GetASNDBPath returns the path for the GeoLite2-ASN database.
+func GetASNDBPath() string {
+	return GetMaxMindDBPath("GeoLite2-ASN.mmdb")
+}
+
+// GetGeoDBPath returns the path for the GeoLite2-City database.
+func GetGeoDBPath() string {
+	return GetMaxMindDBPath("GeoLite2-City.mmdb")
+}
+
 // GenerateExample generates an example configuration file content.
 func GenerateExample() string {
 	return `# Poros Configuration File
@@ -240,6 +284,13 @@ defaults:
     rdns: true            # Reverse DNS lookups
     asn: true             # ASN lookups
     geoip: true           # GeoIP lookups
+
+# MaxMind GeoLite2 database settings (optional)
+# Get free license key: https://www.maxmind.com/en/geolite2/signup
+maxmind:
+  enabled: false          # Enable MaxMind databases (faster, offline)
+  license_key: ""         # Your MaxMind license key
+  update_hours: 24        # Auto-update interval (0 = no auto-update)
 
 # Target aliases (optional)
 aliases:

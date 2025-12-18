@@ -8,10 +8,11 @@ import (
 
 // Enricher performs IP enrichment with rDNS, ASN, and GeoIP data.
 type Enricher struct {
-	config EnricherConfig
-	rdns   *RDNSResolver
-	asn    ASNLookup
-	geo    GeoLookup
+	config   EnricherConfig
+	rdns     *RDNSResolver
+	asn      ASNLookup
+	geo      GeoLookup
+	maxmind  *MaxMindDB // Optional MaxMind database for offline/faster lookups
 }
 
 // EnricherConfig holds configuration for the enricher.
@@ -63,6 +64,35 @@ func NewEnricher(config EnricherConfig) *Enricher {
 	return e
 }
 
+// NewEnricherWithMaxMind creates a new enricher with MaxMind database support.
+// If MaxMind is configured and databases are available, they are used for ASN/GeoIP.
+// Otherwise, falls back to online APIs (Team Cymru, ip-api.com).
+func NewEnricherWithMaxMind(config EnricherConfig, maxmindDB *MaxMindDB) *Enricher {
+	e := &Enricher{
+		config:  config,
+		maxmind: maxmindDB,
+	}
+
+	if config.EnableRDNS {
+		e.rdns = NewRDNSResolver(DefaultRDNSConfig())
+	}
+
+	// Only create API lookups if MaxMind doesn't have the data
+	if config.EnableASN {
+		if maxmindDB == nil || !maxmindDB.HasASN() {
+			e.asn = NewTeamCymruASN(DefaultTeamCymruConfig())
+		}
+	}
+
+	if config.EnableGeoIP {
+		if maxmindDB == nil || !maxmindDB.HasGeo() {
+			e.geo = NewIPAPIGeo(DefaultIPAPIConfig())
+		}
+	}
+
+	return e
+}
+
 // EnrichmentResult contains the results of IP enrichment.
 type EnrichmentResult struct {
 	Hostname string
@@ -78,32 +108,63 @@ func (e *Enricher) EnrichIP(ctx context.Context, ip net.IP) *EnrichmentResult {
 
 	result := &EnrichmentResult{}
 	var wg sync.WaitGroup
+	var mu sync.Mutex
 
-	// Reverse DNS
+	// Reverse DNS (always use system DNS)
 	if e.config.EnableRDNS && e.rdns != nil {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			hostname, _ := e.rdns.Lookup(ctx, ip)
+			mu.Lock()
 			result.Hostname = hostname
+			mu.Unlock()
 		}()
 	}
 
-	// ASN
-	if e.config.EnableASN && e.asn != nil {
+	// ASN - try MaxMind first, then fall back to API
+	if e.config.EnableASN {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			result.ASN, _ = e.asn.Lookup(ctx, ip)
+			var asn *ASNInfo
+
+			// Try MaxMind first
+			if e.maxmind != nil && e.maxmind.HasASN() {
+				asn, _ = e.maxmind.LookupASN(ip)
+			}
+
+			// Fall back to API if MaxMind didn't have data
+			if asn == nil && e.asn != nil {
+				asn, _ = e.asn.Lookup(ctx, ip)
+			}
+
+			mu.Lock()
+			result.ASN = asn
+			mu.Unlock()
 		}()
 	}
 
-	// GeoIP
-	if e.config.EnableGeoIP && e.geo != nil {
+	// GeoIP - try MaxMind first, then fall back to API
+	if e.config.EnableGeoIP {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			result.Geo, _ = e.geo.Lookup(ctx, ip)
+			var geo *GeoInfo
+
+			// Try MaxMind first
+			if e.maxmind != nil && e.maxmind.HasGeo() {
+				geo, _ = e.maxmind.LookupGeo(ip)
+			}
+
+			// Fall back to API if MaxMind didn't have data
+			if geo == nil && e.geo != nil {
+				geo, _ = e.geo.Lookup(ctx, ip)
+			}
+
+			mu.Lock()
+			result.Geo = geo
+			mu.Unlock()
 		}()
 	}
 
@@ -165,6 +226,9 @@ func (e *Enricher) Close() error {
 	}
 	if e.geo != nil {
 		e.geo.Close()
+	}
+	if e.maxmind != nil {
+		e.maxmind.Close()
 	}
 	return nil
 }
