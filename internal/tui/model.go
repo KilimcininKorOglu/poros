@@ -189,13 +189,13 @@ func (m Model) renderHops() string {
 
 	var rows []string
 
-	// Header row
-	header := fmt.Sprintf("%-4s %-15s %-25s %-10s %-10s %-10s",
+	// Header row - use fixed width columns
+	header := fmt.Sprintf("%-4s  %-16s  %-22s  %9s  %8s  %8s",
 		"Hop", "IP", "Hostname", "Avg", "Min", "Max")
 	rows = append(rows, m.styles.Header.Render(header))
 
 	// Separator
-	rows = append(rows, m.styles.Subtle.Render(strings.Repeat("─", 80)))
+	rows = append(rows, m.styles.Subtle.Render(strings.Repeat("─", 76)))
 
 	// Hop rows
 	for _, hop := range m.hops {
@@ -207,43 +207,44 @@ func (m Model) renderHops() string {
 
 // renderHopRow renders a single hop row.
 func (m Model) renderHopRow(hop trace.Hop) string {
+	// Format values with fixed widths FIRST, then apply colors
 	hopNum := fmt.Sprintf("%-4d", hop.Number)
-
+	
 	var ip, hostname, avg, min, max string
+	var avgRTT float64
 
 	if !hop.Responded {
-		ip = "*"
-		hostname = ""
-		avg = "*"
-		min = "*"
-		max = "*"
+		ip = fmt.Sprintf("%-16s", "*")
+		hostname = fmt.Sprintf("%-22s", "*")
+		avg = fmt.Sprintf("%9s", "*")
+		min = fmt.Sprintf("%8s", "*")
+		max = fmt.Sprintf("%8s", "*")
 	} else {
 		if hop.IP != nil {
-			ip = hop.IP.String()
+			ip = fmt.Sprintf("%-16s", truncate(hop.IP.String(), 16))
 		} else {
-			ip = "*"
+			ip = fmt.Sprintf("%-16s", "*")
 		}
-		hostname = truncate(hop.Hostname, 25)
+		hostname = fmt.Sprintf("%-22s", truncate(hop.Hostname, 22))
 
 		if hop.AvgRTT > 0 {
-			avg = fmt.Sprintf("%.2f ms", hop.AvgRTT)
-			min = fmt.Sprintf("%.2f", hop.MinRTT)
-			max = fmt.Sprintf("%.2f", hop.MaxRTT)
+			avgRTT = hop.AvgRTT
+			avg = fmt.Sprintf("%6.2f ms", hop.AvgRTT)
+			min = fmt.Sprintf("%8.2f", hop.MinRTT)
+			max = fmt.Sprintf("%8.2f", hop.MaxRTT)
 		} else {
-			avg = "-"
-			min = "-"
-			max = "-"
+			avg = fmt.Sprintf("%9s", "-")
+			min = fmt.Sprintf("%8s", "-")
+			max = fmt.Sprintf("%8s", "-")
 		}
 	}
 
-	// Color RTT based on latency
-	avgStyled := m.colorizeRTT(avg, hop.AvgRTT)
-
-	return fmt.Sprintf("%-4s %-15s %-25s %-10s %-10s %-10s",
+	// Now apply colors to pre-formatted strings
+	return fmt.Sprintf("%s  %s  %s  %s  %s  %s",
 		m.styles.HopNum.Render(hopNum),
-		m.styles.IP.Render(truncate(ip, 15)),
+		m.styles.IP.Render(ip),
 		m.styles.Hostname.Render(hostname),
-		avgStyled,
+		m.colorizeRTT(avg, avgRTT),
 		m.styles.Subtle.Render(min),
 		m.styles.Subtle.Render(max),
 	)
